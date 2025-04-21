@@ -66,7 +66,9 @@ bun add @compute3ai/plugin-compute3ai-mcp
 
 ## 🚀 Usage
 
-1. Add the plugin to your character configuration:
+1.deploy and mcp server 
+ - examples can be found here https://github.com/modelcontextprotocol/servers/
+2. Add the plugin to your character configuration:
 
 ```json
 {
