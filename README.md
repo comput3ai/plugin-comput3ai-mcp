@@ -21,7 +21,11 @@ https://comput3.ai/
 
 top up your account and launch gpus
 
-# OpenAI Configuration
+get your eliza agent on 
+https://github.com/elizaOS/eliza
+
+add compute3 configurations to the .env file.
+
 OPENAI_API_KEY=c3_api_key
 OPENAI_API_URL=https://api.comput3.ai/v1
 SMALL_OPENAI_MODEL=hermes3:70b
