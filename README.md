@@ -43,7 +43,7 @@ To integrate this plugin into your ElizaOS project:
 ## 📦 Installation
 
 Install the plugin in your ElizaOS project:
-
+```bash
 packages/
 ├─plugin-comput3ai-mcp/    # Your plugin directory
    ├── package.json
@@ -54,9 +54,7 @@ packages/
    │   ├── providers/      # Data providers
    │   ├── types.ts        # Type definitions
    │   └── environment.ts  # Configuration
-   ├── README.md
-   └── LICENSE
-
+```
 1. Clone the repository:
 ```bash
 git clone github:comput3ai/plugin-comput3ai-mcp
