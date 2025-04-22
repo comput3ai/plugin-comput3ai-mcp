@@ -16,13 +16,19 @@ This plugin supercharges your ElizaOS agents by providing access to multiple MCP
 
 ## 🚀 Getting Started
 
+
 create an account on 
 https://comput3.ai/
 
 top up your account and launch gpus
 
 get your eliza agent on 
-https://github.com/elizaOS/eliza
+```bash
+git clone https://github.com/elizaos/eliza-starter.git
+cd eliza-starter
+cp .env.example .env
+pnpm i && pnpm build && pnpm start
+```
 
 add compute3 configurations to the .env file.
 
@@ -38,6 +44,18 @@ To integrate this plugin into your ElizaOS project:
 
 Install the plugin in your ElizaOS project:
 
+packages/
+├─plugin-comput3ai-mcp/    # Your plugin directory
+   ├── package.json
+   ├── tsconfig.json
+   ├── src/
+   │   ├── index.ts        # Main plugin entry
+   │   ├── actions/        # Custom actions
+   │   ├── providers/      # Data providers
+   │   ├── types.ts        # Type definitions
+   │   └── environment.ts  # Configuration
+   ├── README.md
+   └── LICENSE
 
 1. Clone the repository:
 ```bash
