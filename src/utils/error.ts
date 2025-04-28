@@ -1,3 +1,4 @@
+import type { State } from "@elizaos/core";
 import {
   type HandlerCallback,
   type IAgentRuntime,
@@ -6,7 +7,6 @@ import {
   composePromptFromState,
   logger,
 } from "@elizaos/core";
-import type { State } from "@elizaos/core";
 import { errorAnalysisPrompt } from "../templates/errorAnalysisPrompt";
 import type { McpProvider } from "../types";
 
