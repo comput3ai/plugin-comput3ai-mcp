@@ -89,24 +89,39 @@ bun add @compute3ai/plugin-compute3ai-mcp
 
 1.deploy and mcp server 
  - examples can be found here https://github.com/modelcontextprotocol/servers/
+ 
+ - or you can use https://n8n.io/
+
+ ![alt text](images/Screenshot.png)
+
 2. Add the plugin to your character configuration:
 
 ```json
 {
   "name": "Your Character",
   "plugins": ["@compute3ai/plugin-compute3ai-mcp"],
-  "settings": {
-    "mcp": {
-      "servers": {
-        "github": {
-          "type": "stdio",
-          "name": "Code Server",
-          "command": "npx",
-          "args": ["-y", "@modelcontextprotocol/server-github"]
-        }
-      }
+     "settings": {
+        "mcp": {
+            "servers": {
+                "n8n": {
+                    "name": "n8n",
+                    "type": "sse",
+                    "command": "npx",
+                    "args": [
+                    "-y",
+                    "supergateway",
+                    "--sse",
+                   "https://comput3ai.app.n8n.cloud/mcp/tutorial/sse"],
+                   "url": "https://comput3ai.app.n8n.cloud/mcp/tutorial/sse",
+                   "timeout": 10000,
+                   "interval": 10000,
+                   "max_retries": 3,
+                   "retry_delay": 1000
+                }
+
+            }
+          },
     }
-  }
 }
 ```
 
