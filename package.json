@@ -1,5 +1,5 @@
 {
-  "name": "@compute3ai/plugin-compute3ai-mcp",
+  "name": "@compute3ai/plugin-comput3ai-mcp",
   "description": "ElizaOS plugin to integrate with MCP (Model Context Protocol) servers",
   "module": "dist/index.js",
   "main": "dist/index.js",
