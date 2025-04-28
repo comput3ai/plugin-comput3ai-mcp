@@ -42,8 +42,13 @@ export const callToolAction: Action = {
   validate: async (runtime: IAgentRuntime, _message: Memory, _state?: State): Promise<boolean> => {
     logger.debug("Validating CALL_TOOL action");
     try {
-      // Try to get the MCP service
-      let mcpService = runtime.getService<McpService>('MCP_SSE' as any);
+      // Try to get the service from our global instance first
+      let mcpService = getGlobalMcpService();
+      
+      // If not available from global instance, try the registry
+      if (!mcpService) {
+        mcpService = runtime.getService<McpService>('MCP_SSE' as any);
+      }
       
       // Enhanced error logging for debugging service initialization issues
       if (!mcpService) {
@@ -60,42 +65,33 @@ export const callToolAction: Action = {
         }
       }
       
-      // Add detailed service debugging
-      logger.debug({
-        serviceType: mcpService.constructor?.name || typeof mcpService,
-        methods: Object.keys(mcpService),
-        hasGetServers: typeof mcpService.getServers === 'function',
-        hasGetProviderData: typeof mcpService.getProviderData === 'function'
-      }, "MCP Service details:");
+      logger.debug(`Found MCP Service. Type: ${mcpService.constructor?.name || typeof mcpService}`);
       
       if (typeof mcpService.getServers !== 'function') {
         logger.error("MCP Service exists but is not properly initialized (missing getServers method).");
-        
-        // We can't proceed without a way to list servers
+        logger.debug({
+          serviceType: mcpService.constructor?.name || typeof mcpService,
+          methods: Object.keys(mcpService)
+        }, "Service details:");
         return false;
       }
 
-      try {
-        const servers = mcpService.getServers();
-        const isServiceReady = (
-          Array.isArray(servers) &&
-          servers.length > 0 &&
-          servers.some(
-            (server) => server.status === "connected" && Array.isArray(server.tools) && server.tools.length > 0
-          )
-        );
+      const servers = mcpService.getServers();
+      const isServiceReady = (
+        Array.isArray(servers) &&
+        servers.length > 0 &&
+        servers.some(
+          (server) => server.status === "connected" && Array.isArray(server.tools) && server.tools.length > 0
+        )
+      );
 
-        if (!isServiceReady) {
-          logger.warn("No connected MCP server with tools available.");
-          return false;
-        }
-
-        logger.debug("CALL_TOOL validation successful");
-        return true;
-      } catch (error) {
-        logger.error(`Error checking server status: ${error instanceof Error ? error.message : String(error)}`);
+      if (!isServiceReady) {
+        logger.warn("No connected MCP server with tools available.");
         return false;
       }
+
+      logger.debug("CALL_TOOL validation successful");
+      return true;
     } catch (error) {
       logger.error(`CALL_TOOL validation error: ${error instanceof Error ? error.message : String(error)}`);
       return false;

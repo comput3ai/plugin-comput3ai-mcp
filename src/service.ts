@@ -274,7 +274,6 @@ export class McpService extends Service {
       }
 
       const actualTools = await this.fetchToolsList(name, connection);
-      console.log(actualTools);
       const actualResources = await this.fetchResourcesList(name, connection);
       const actualResourceTemplates = await this.fetchResourceTemplatesList(name, connection);
 
@@ -339,10 +338,10 @@ export class McpService extends Service {
         }
       }
 
-      const hasWeatherTool = actualTools.some(tool => tool.name === "search");
+      const hasWeatherTool = actualTools.some(tool => tool.name === "weather");
 
       if (hasWeatherTool) {
-        logger.info(`[${name}] Search tool found. Synthesizing Resource and ResourceTemplate.`);
+        logger.info(`[${name}] Weather tool found. Synthesizing Resource and ResourceTemplate.`);
         const weatherResource: Resource = {
           uri: weatherResourceTemplate.uriTemplate,
           name: weatherResourceTemplate.name,

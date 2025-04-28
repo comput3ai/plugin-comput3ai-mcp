@@ -87,10 +87,15 @@ export const readResourceAction: Action = {
     const validationId = message.id?.substring(0, 8) || 'unknown';
     logger.debug({ validationId }, `[READ_RESOURCE] Starting validation...`);
     
-    try {
-      let mcpService = runtime.getService<McpService>('MCP_SSE' as any);
-      
-      if (!mcpService) {
+    // Try to get the service from our global instance first
+    let mcpService = getGlobalMcpService();
+    
+    // If not available from global instance, try the registry
+    if (!mcpService) {
+      mcpService = runtime.getService<McpService>('MCP_SSE' as any);
+    }
+    
+    if (!mcpService) {
         logger.error({ validationId }, "[READ_RESOURCE] Validation failed: MCP Service instance not found.");
         
         // Try to register the service manually as a fallback
@@ -102,60 +107,28 @@ export const readResourceAction: Action = {
           logger.error({ validationId }, `Failed to register MCP service as fallback: ${regError instanceof Error ? regError.message : String(regError)}`);
           return false;
         }
-      }
-      
-      // Add detailed logging about the service
-      logger.debug({ 
-        validationId,
+    }
+    
+    // Check if the service is properly initialized with the required methods
+    if (typeof mcpService.checkResourceAvailability !== 'function') {
+      logger.error({ validationId }, "[READ_RESOURCE] Validation failed: MCP Service is not properly initialized (missing checkResourceAvailability method).");
+      logger.debug({
         serviceType: mcpService.constructor?.name || typeof mcpService,
-        methods: Object.keys(mcpService),
-        hasCheckResourceAvailability: typeof mcpService.checkResourceAvailability === 'function',
-        hasGetServers: typeof mcpService.getServers === 'function' 
-      }, "[READ_RESOURCE] MCP Service details:");
-      
-      // Check if the service is properly initialized with the required methods
-      if (typeof mcpService.checkResourceAvailability !== 'function') {
-        logger.error({ validationId }, "[READ_RESOURCE] Validation failed: MCP Service is not properly initialized (missing checkResourceAvailability method).");
-        
-        // If getServers is available, we can still proceed with a manual check
-        if (typeof mcpService.getServers === 'function') {
-          logger.info({ validationId }, "[READ_RESOURCE] Attempting fallback resource availability check using getServers method");
-          const servers = mcpService.getServers();
-          const hasResources = Array.isArray(servers) && 
-            servers.some(server => 
-              server.status === "connected" && 
-              Array.isArray(server.resources) && 
-              server.resources.length > 0
-            );
-            
-          if (hasResources) {
-            logger.success({ validationId }, "[READ_RESOURCE] Fallback validation successful (Resources available on at least one server)");
-            return true;
-          }
-        }
-        
-        return false;
-      }
-
-      // Call the method on the service instance to check resource availability
-      try {
-        const resourcesAvailable = mcpService.checkResourceAvailability();
-        
-        if (!resourcesAvailable) {
-          logger.warn({ validationId }, "[READ_RESOURCE] Validation failed: No connected MCP servers reported available resources during initialization.");
-          return false;
-        }
-        
-        logger.success({ validationId }, "[READ_RESOURCE] Validation successful (Resources available on at least one server)");
-        return true;
-      } catch (error) {
-        logger.error({ validationId }, `[READ_RESOURCE] Error checking resource availability: ${error instanceof Error ? error.message : String(error)}`);
-        return false;
-      }
-    } catch (error) {
-      logger.error({ validationId }, `[READ_RESOURCE] Unexpected error during validation: ${error instanceof Error ? error.message : String(error)}`);
+        methods: Object.keys(mcpService)
+      }, "Service details:");
       return false;
     }
+
+    // Call the method on the service instance to check resource availability
+    const resourcesAvailable = mcpService.checkResourceAvailability();
+
+    if (!resourcesAvailable) {
+        logger.warn({ validationId }, "[READ_RESOURCE] Validation failed: No connected MCP servers reported available resources during initialization.");
+        return false;
+    }
+
+    logger.success({ validationId }, "[READ_RESOURCE] Validation successful (Resources available on at least one server)");
+    return true;
   },
 
   handler: async (
