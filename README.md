@@ -57,6 +57,7 @@ packages/
 ```
 1. Clone the repository:
 ```bash
+cd packages
 git clone github:comput3ai/plugin-comput3ai-mcp
 ```
 
