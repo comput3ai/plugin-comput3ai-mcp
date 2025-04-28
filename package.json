@@ -15,8 +15,9 @@
     "elizaos-plugins"
   ],
   "scripts": {
-    "build": "bun build ./src/index.ts --outdir ./dist --target node --minify --treeshake",
-    "types": "bunx tsc --emitDeclarationOnly --outDir ./dist",
+    "clean": "rm -rf dist",
+    "build": "pnpm run clean && tsc",
+    "types": "tsc --emitDeclarationOnly --outDir ./dist",
     "check:write": "bunx @biomejs/biome check --write ./src",
     "check": "bunx @biomejs/biome check ./src",
     "ci": "bunx @biomejs/biome ci ./src",
@@ -30,17 +31,20 @@
   "devDependencies": {
     "@biomejs/biome": "1.9.4",
     "@types/bun": "1.2.5",
+    "@types/node": "^22.15.3",
     "bumpp": "10.1.0",
     "typescript": "^5.0.0"
   },
   "dependencies": {
-    "@elizaos/core": "0.25.9",
+    "@elizaos/core": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.7.0",
     "ajv": "^8.17.1",
-    "json5": "^2.2.3"
+    "ajv-errors": "^3.0.0",
+    "json5": "^2.2.3",
+    "onnxruntime-node": "^1.18.0"
   },
   "agentConfig": {
-    "pluginType": "elizaos:plugin:0.25.9",
+    "pluginType": "elizaos:plugin:1.0.0",
     "pluginParameters": {}
   }
 }

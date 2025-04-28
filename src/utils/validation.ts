@@ -1,6 +1,13 @@
 import type { State } from "@elizaos/core";
-import { type McpProviderData, ResourceSelectionSchema, ToolSelectionSchema } from "../types";
-import { validateJsonSchema } from "./json";
+import { elizaLogger as logger } from "@elizaos/core";
+import Ajv from "ajv";
+import ajvErrors from "ajv-errors";
+import { calculatorToolSelectionTemplate } from "../templates/calculatorToolSelectionTemplate";
+import { weatherToolSelectionTemplate } from "../templates/weatherToolSelectionTemplate";
+import { ResourceSelectionSchema, ToolSelectionSchema } from "../types";
+
+const ajv = new Ajv({ allErrors: true });
+ajvErrors(ajv);
 
 export interface ToolSelection {
   serverName: string;
@@ -17,144 +24,164 @@ export interface ResourceSelection {
   noResourceAvailable?: boolean;
 }
 
+export interface McpProviderData {
+  text: string;
+  values: Record<string, any>;
+  data: Record<string, any>;
+}
+
 export function validateToolSelection(
-  selection: unknown,
-  composedState: State
+  data: unknown,
+  state?: State
 ): { success: true; data: ToolSelection } | { success: false; error: string } {
-  const basicResult = validateJsonSchema<ToolSelection>(selection, ToolSelectionSchema);
-  if (!basicResult.success) {
-    return { success: false, error: basicResult.error };
-  }
+  let parsedInput: any = null;
 
-  const data = basicResult.data;
-
-  if (data.noToolAvailable) {
-    return { success: true, data };
-  }
-
-  const mcpData = composedState.values.mcp || {};
-  const serverInfo = mcpData[data.serverName];
-
-  if (!serverInfo || serverInfo.status !== "connected") {
-    return {
-      success: false,
-      error: `Server '${data.serverName}' not found or not connected`,
-    };
-  }
-
-  const toolInfo = serverInfo.tools?.[data.toolName];
-  if (!toolInfo) {
-    return {
-      success: false,
-      error: `Tool '${data.toolName}' not found on server '${data.serverName}'`,
-    };
-  }
-
-  if (toolInfo.inputSchema) {
-    const validationResult = validateJsonSchema(
-      data.arguments,
-      toolInfo.inputSchema as Record<string, unknown>
-    );
-
-    if (!validationResult.success) {
-      return {
-        success: false,
-        error: `Invalid arguments: ${validationResult.error}`,
-      };
+  try {
+    if (typeof data === 'string') {
+      // Extract JSON from a code block if present
+      const jsonMatch = data.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
+      const jsonString = jsonMatch ? jsonMatch[1] : data;
+      parsedInput = JSON.parse(jsonString);
+    } else {
+      // If it's already an object, use it directly
+      parsedInput = data;
     }
+  } catch (e) {
+    const errorMsg = `Failed to parse JSON from tool selection response: ${e}`;
+    logger.error(errorMsg);
+    return { success: false, error: errorMsg };
   }
 
-  return { success: true, data };
+  const validate = ajv.compile(ToolSelectionSchema);
+  const valid = validate(parsedInput);
+
+  if (!valid) {
+    const errors = validate.errors;
+    const errorMsg = `Tool selection validation failed: ${JSON.stringify(errors, null, 2)}`;
+    logger.error(errorMsg);
+    return { success: false, error: errorMsg };
+  }
+
+  return { success: true, data: parsedInput as ToolSelection };
 }
 
 export function validateResourceSelection(
-  selection: unknown
+  data: unknown
 ): { success: true; data: ResourceSelection } | { success: false; error: string } {
-  return validateJsonSchema<ResourceSelection>(selection, ResourceSelectionSchema);
+  let parsedInput: any = null;
+
+  try {
+    if (typeof data === 'string') {
+      // Clean up input in case it has code blocks or other formatting
+      const cleanedInput = data.replace(/```json|```/g, "").trim();
+      parsedInput = JSON.parse(cleanedInput);
+    } else {
+      // If it's already an object, use it directly
+      parsedInput = data;
+    }
+  } catch (e) {
+    const errorMsg = `Failed to parse JSON from resource selection response: ${e}`;
+    logger.error(errorMsg);
+    return { success: false, error: errorMsg };
+  }
+
+  const validate = ajv.compile(ResourceSelectionSchema);
+  const valid = validate(parsedInput);
+
+  if (!valid) {
+    const errors = validate.errors;
+    const errorMsg = `Resource selection validation failed: ${JSON.stringify(errors, null, 2)}`;
+    logger.error(errorMsg);
+    return { success: false, error: errorMsg };
+  }
+
+  return { success: true, data: parsedInput as ResourceSelection };
 }
 
 export function createToolSelectionFeedbackPrompt(
   originalResponse: string,
   errorMessage: string,
-  composedState: State,
+  state: State & { mcpProvider?: { text?: string } },
   userMessage: string
 ): string {
-  let toolsDescription = "";
+  // Check if this might be a calculator request
+  const calculatorRegex = /\b(\d+\s*[\+\-\*\/\(\)\^\%]\s*\d+|\bsum\b|\bcalculate\b|\bcompute\b|\bsolve\b|\bdivide\b|\bmultiply\b|\badd\b|\bsubtract\b)/i;
+  const isCalculationRequest = calculatorRegex.test(userMessage);
+  
+  // Check if this might be a weather request
+  const weatherRegex = /\b(weather|temperature|forecast|rain|sunny|cloudy|humidity|wind|climate|cold|hot|warm|chilly)\b.*?\b(in|at|for|of)\b.*?\b([A-Z][a-z]+ ?[A-Z]?[a-z]*|[A-Z]{2,})\b/i;
+  const isWeatherRequest = weatherRegex.test(userMessage);
+  
+  if (isCalculationRequest) {
+    // For calculation requests, use the specialized calculator template
+    return calculatorToolSelectionTemplate
+      .replace("{{userMessage}}", userMessage)
+      .replace("{{mcpProvider.text}}", state.mcpProvider?.text || "");
+  } else if (isWeatherRequest) {
+    // For weather requests, use the specialized weather template
+    return weatherToolSelectionTemplate
+      .replace("{{userMessage}}", userMessage)
+      .replace("{{mcpProvider.text}}", state.mcpProvider?.text || "");
+  } else {
+    // For other requests, use a generic template with error feedback
+    return `
+Your previous tool selection response had errors: ${errorMessage}
 
-  for (const [serverName, server] of Object.entries(composedState.values.mcp || {}) as [
-    string,
-    McpProviderData[string],
-  ][]) {
-    if (server.status !== "connected") continue;
+User request: ${userMessage}
 
-    for (const [toolName, tool] of Object.entries(server.tools || {}) as [
-      string,
-      { description?: string },
-    ][]) {
-      toolsDescription += `Tool: ${toolName} (Server: ${serverName})\n`;
-      toolsDescription += `Description: ${tool.description || "No description available"}\n\n`;
-    }
+Available MCP tools:
+${state.mcpProvider?.text || "No tools available"}
+
+Please analyze the user request and select the most appropriate tool, or indicate that no tool is suitable.
+Respond with valid JSON (no code block formatting) like:
+
+{
+  "serverName": "n8n",
+  "toolName": "calculator",
+  "arguments": { 
+    "input": "2+2"
+  },
+  "reasoning": "The user wants to calculate 2+2"
+}
+
+Or if no tool is suitable:
+
+{
+  "noToolAvailable": true,
+  "reasoning": "The user is asking a general question that doesn't require a specialized tool"
+}
+`;
   }
-
-  return createFeedbackPrompt(
-    originalResponse,
-    errorMessage,
-    "tool",
-    toolsDescription,
-    userMessage
-  );
 }
 
 export function createResourceSelectionFeedbackPrompt(
   originalResponse: string,
   errorMessage: string,
-  composedState: State,
+  state: State & { mcpProvider?: { text?: string } },
   userMessage: string
 ): string {
-  let resourcesDescription = "";
+  return `
+Your previous resource selection response had errors: ${errorMessage}
 
-  for (const [serverName, server] of Object.entries(composedState.values.mcp || {}) as [
-    string,
-    McpProviderData[string],
-  ][]) {
-    if (server.status !== "connected") continue;
+User request: ${userMessage}
 
-    for (const [uri, resource] of Object.entries(server.resources || {}) as [
-      string,
-      { description?: string; name?: string },
-    ][]) {
-      resourcesDescription += `Resource: ${uri} (Server: ${serverName})\n`;
-      resourcesDescription += `Name: ${resource.name || "No name available"}\n`;
-      resourcesDescription += `Description: ${
-        resource.description || "No description available"
-      }\n\n`;
-    }
-  }
+Available MCP resources:
+${state.mcpProvider?.text || "No resources available"}
 
-  return createFeedbackPrompt(
-    originalResponse,
-    errorMessage,
-    "resource",
-    resourcesDescription,
-    userMessage
-  );
+Please analyze the user request and select the most appropriate resource, or indicate that no resource is suitable.
+Respond with valid JSON (no code block formatting or comments) like:
+
+{
+  "serverName": "github",
+  "uri": "github://elizaos/eliza/README.md",
+  "reasoning": "The user wants information about the Eliza project which is in the README"
 }
 
-function createFeedbackPrompt(
-  originalResponse: string,
-  errorMessage: string,
-  itemType: string,
-  itemsDescription: string,
-  userMessage: string
-): string {
-  return `Error parsing JSON: ${errorMessage}
+Or if no resource is suitable:
 
-Your original response:
-${originalResponse}
-
-Please try again with valid JSON for ${itemType} selection.
-Available ${itemType}s:
-${itemsDescription}
-
-User request: ${userMessage}`;
+{
+  "noResourceAvailable": true,
+  "reasoning": "The user is asking a question that doesn't match any available resource"
+}
+`;
 }

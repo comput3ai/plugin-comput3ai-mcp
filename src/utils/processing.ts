@@ -4,14 +4,20 @@ import {
   type IAgentRuntime,
   type Media,
   type Memory,
-  ModelType,
-  createUniqueUuid,
-  logger,
+  ModelClass,
+  type State,
+  generateText,
+  elizaLogger as logger
 } from "@elizaos/core";
-import { type State, composePromptFromState } from "@elizaos/core";
 import { resourceAnalysisTemplate } from "../templates/resourceAnalysisTemplate";
 import { toolReasoningTemplate } from "../templates/toolReasoningTemplate";
 import { createMcpMemory } from "./mcp";
+
+function composePromptFromState({ state, template }: { state: State, template: string }): string {
+  return template.replace(/\{\{(\w+)\}\}/g, (_, key) => 
+    (state.values as any)[key] || state[key] || ''
+  );
+}
 
 export function processResourceResult(
   result: {
@@ -75,7 +81,7 @@ export function processToolResult(
       attachments.push({
         contentType: content.mimeType,
         url: `data:${content.mimeType};base64,${content.data}`,
-        id: createUniqueUuid(runtime, messageEntityId),
+        id: `img-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
         title: "Generated image",
         source: `${serverName}/${toolName}`,
         description: "Tool-generated image",
@@ -115,8 +121,10 @@ export async function handleResourceAnalysis(
     resourceMeta
   );
 
-  const analyzedResponse = await runtime.useModel(ModelType.TEXT_SMALL, {
-    prompt: analysisPrompt,
+  const analyzedResponse = await generateText({
+    runtime: runtime,
+    context: analysisPrompt,
+    modelClass: ModelClass.SMALL,
   });
 
   if (callback) {
@@ -163,8 +171,10 @@ export async function handleToolResponse(
 
   logger.info("reasoning prompt: ", reasoningPrompt);
 
-  const reasonedResponse = await runtime.useModel(ModelType.TEXT_SMALL, {
-    prompt: reasoningPrompt,
+  const reasonedResponse = await generateText({
+    runtime: runtime,
+    context: reasoningPrompt,
+    modelClass: ModelClass.SMALL,
   });
 
   if (callback) {
@@ -195,7 +205,7 @@ function createAnalysisPrompt(
   resourceContent: string,
   resourceMeta: string
 ): string {
-  const enhancedState: State = {
+  const enhancedState = {
     data: {},
     text: "",
     values: {
@@ -204,7 +214,7 @@ function createAnalysisPrompt(
       resourceContent,
       resourceMeta,
     },
-  };
+  } as unknown as State;
 
   return composePromptFromState({
     state: enhancedState,
@@ -228,7 +238,7 @@ function createReasoningPrompt(
   const enhancedState: State = {
     ...state,
     values: {
-      ...state.values,
+      ...(state.values as any),
       mcpProvider,
       toolName,
       serverName,

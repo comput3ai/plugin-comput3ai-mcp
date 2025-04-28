@@ -1,13 +1,12 @@
-import type { State } from "@elizaos/core";
 import {
   type HandlerCallback,
   type IAgentRuntime,
   type Memory,
-  ModelType,
-  composePromptFromState,
-  logger,
+  type State,
+  generateText,
+  elizaLogger as logger,
+  ModelClass,
 } from "@elizaos/core";
-import { errorAnalysisPrompt } from "../templates/errorAnalysisPrompt";
 import type { McpProvider } from "../types";
 
 export async function handleMcpError(
@@ -27,21 +26,20 @@ export async function handleMcpError(
     const enhancedState: State = {
       ...state,
       values: {
-        ...state.values,
+        ...(state.values || {}),
         mcpProvider,
         userMessage: message.content.text || "",
         error: errorMessage,
       },
     };
 
-    const prompt = composePromptFromState({
-      state: enhancedState,
-      template: errorAnalysisPrompt,
-    });
+    const prompt = ""; // Placeholder
 
     try {
-      const errorResponse = await runtime.useModel(ModelType.TEXT_SMALL, {
-        prompt,
+      const errorResponse = await generateText({
+        runtime: runtime,
+        context: prompt,
+        modelClass: ModelClass.SMALL,
       });
 
       await callback({

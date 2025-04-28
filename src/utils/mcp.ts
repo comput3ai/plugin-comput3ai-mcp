@@ -2,9 +2,10 @@ import {
   type HandlerCallback,
   type IAgentRuntime,
   type Memory,
-  ModelType,
+  ModelClass,
   type State,
-  logger,
+  generateText,
+  elizaLogger as logger
 } from "@elizaos/core";
 import {
   DEFAULT_MAX_RETRIES,
@@ -62,8 +63,10 @@ export async function withModelRetry<T>(
         message.content.text || ""
       );
 
-      const retrySelection = await runtime.useModel(ModelType.TEXT_SMALL, {
-        prompt: feedbackPrompt,
+      const retrySelection = await generateText({
+        runtime: runtime,
+        context: feedbackPrompt,
+        modelClass: ModelClass.SMALL,
       });
 
       return withModelRetry(
@@ -93,8 +96,9 @@ export async function withModelRetry<T>(
 
 export function getMaxRetries(runtime: IAgentRuntime): number {
   try {
-    const settings = runtime.getSetting("mcp");
-    if (settings && "maxRetries" in settings && settings.maxRetries !== undefined) {
+    const settingsStr = runtime.getSetting("mcp");
+    const settings = settingsStr ? JSON.parse(settingsStr) : null;
+    if (settings && typeof settings === 'object' && "maxRetries" in settings) {
       const configValue = Number(settings.maxRetries);
       if (!Number.isNaN(configValue) && configValue >= 0) {
         logger.info(`Using configured selection retries: ${configValue}`);
@@ -138,21 +142,21 @@ export async function createMcpMemory(
   content: string,
   metadata: Record<string, unknown>
 ): Promise<void> {
-  const memory = await runtime.addEmbeddingToMemory({
-    entityId: message.entityId,
+  const memory = {
+    id: message.id,
     agentId: runtime.agentId,
+    userId: message.userId,  
     roomId: message.roomId,
     content: {
-      text: `Used the "${type}" from "${serverName}" server. 
-        Content: ${content}`,
+      text: `Used the "${type}" from "${serverName}" server. Content: ${content}`,
       metadata: {
         ...metadata,
         serverName,
       },
-    },
-  });
+    }
+  };
 
-  await runtime.createMemory(memory, type === "resource" ? "resources" : "tools", true);
+  await runtime.messageManager.createMemory(memory, true);
 }
 
 export function buildMcpProviderData(servers: McpServer[]): McpProvider {

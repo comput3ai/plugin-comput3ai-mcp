@@ -1,27 +1,34 @@
-import type { IAgentRuntime, Memory, Provider, State } from "@elizaos/core";
-import { generateText, ModelClass } from "@elizaos/core";
+import {
+  type IAgentRuntime,
+  type Memory,
+  type Provider,
+  type State
+} from "@elizaos/core";
+import { getGlobalMcpService } from "./index";
 import type { McpService } from "./service";
-import { MCP_SERVICE_NAME } from "./types";
+import type { McpProvider } from "./types";
 
 export const provider: Provider = {
-  name: "MCP",
-  description: "Information about connected MCP servers, tools, and resources",
-
-  get: async (runtime: IAgentRuntime, _message: Memory, _state: State) => {
-    const mcpService = runtime.getService<McpService>(MCP_SERVICE_NAME);
+  get: async (runtime: IAgentRuntime, message: Memory, state?: State) => {
+    // Try to get the service from our global instance first
+    let mcpService = getGlobalMcpService();
+    
+    // If not available from global instance, try the registry
     if (!mcpService) {
-      const errorResponse = await generateText({
-        runtime,
-        context: "No MCP servers are available.",
-        modelClass: ModelClass.SMALL,
-      });
+      mcpService = runtime.getService<McpService>('MCP_SSE' as any);
+    }
+    
+    // Defensive check: Ensure service exists and has the expected method
+    if (!mcpService || typeof mcpService.getProviderData !== 'function') {
+      // Return default/empty data if service isn't ready
       return {
         values: { mcp: {} },
         data: { mcp: {} },
-        text: errorResponse,
-      };
+        text: "MCP service not available or not yet initialized.",
+      } as McpProvider;
     }
 
+    // Service is ready, call the method
     return mcpService.getProviderData();
   },
 };

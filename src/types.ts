@@ -10,7 +10,8 @@ import type {
   Tool,
 } from "@modelcontextprotocol/sdk/types.js";
 
-export const MCP_SERVICE_NAME = "mcp";
+
+export const MCP_SERVICE_NAME = "mcp-sse";
 export const DEFAULT_MCP_TIMEOUT_SECONDS = 60000;
 export const MIN_MCP_TIMEOUT_SECONDS = 1;
 export const DEFAULT_MAX_RETRIES = 2;
@@ -154,3 +155,9 @@ export const ResourceSelectionSchema = {
     },
   },
 };
+
+export enum ServiceType {
+  PROVIDER = "PROVIDER",
+  MCP = "MCP",
+  MCP_SSE = "MCP_SSE"
+}
